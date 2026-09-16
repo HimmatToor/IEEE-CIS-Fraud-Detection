@@ -1,0 +1,8 @@
+numpy==1.26.4
+pandas==2.2.2
+torch==2.2.2
+torch-geometric==2.8.0.post1
+pytest==8.4.2
+boto3==1.43.95
+scikit-learn==1.9.1
+xgboost==2.0.3

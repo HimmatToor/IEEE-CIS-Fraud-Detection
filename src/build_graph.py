@@ -11,14 +11,21 @@ IDENTIFIER_COLUMNS = [
     "card1", "card2", "card3", "card5", "card6",
     "addr1", "addr2",
     "P_emaildomain", "R_emaildomain",
-    "DeviceType", "DeviceInfo",
+    "DeviceInfo",
 ]
 
-TRANSACTION_FEATURE_COLUMNS = (
+# DeviceType only has 2 distinct values (desktop/mobile), so as a graph edge it just
+# creates two ~140k-degree hub nodes that mean-aggregation drowns everything else into.
+# Not useless as a signal though, so keep it as a direct feature instead of an edge.
+
+TRANSACTION_NUMERIC_COLUMNS = (
     ["TransactionAmt"]
     + [f"C{i}" for i in range(1, 15)]
     + [f"D{i}" for i in range(1, 16)]
+    + [f"V{i}" for i in range(1, 340)]
 )
+
+TRANSACTION_CATEGORICAL_COLUMNS = ["ProductCD", "DeviceType"] + [f"M{i}" for i in range(1, 10)]
 
 
 def load_raw_tables(data_dir: Path, split: str) -> pd.DataFrame:
@@ -29,9 +36,17 @@ def load_raw_tables(data_dir: Path, split: str) -> pd.DataFrame:
 
 
 def build_transaction_features(df: pd.DataFrame) -> torch.Tensor:
-    features = df[TRANSACTION_FEATURE_COLUMNS].astype(float)
-    features = features.fillna(features.median())
+    numeric = df[TRANSACTION_NUMERIC_COLUMNS].astype(float)
+    numeric = numeric.fillna(numeric.median())
 
+    categorical = pd.DataFrame(
+        {
+            column: df[column].astype("category").cat.codes.astype(float)
+            for column in TRANSACTION_CATEGORICAL_COLUMNS
+        }
+    )
+
+    features = pd.concat([numeric, categorical], axis=1)
     values = features.to_numpy()
     mean = values.mean(axis=0, keepdims=True)
     std = values.std(axis=0, keepdims=True)
